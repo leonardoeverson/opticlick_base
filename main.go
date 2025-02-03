@@ -74,6 +74,7 @@ func generateFile(base string, status string) *excelize.File {
 	columns := []string{
 		"PEDIDO",
 		"DT_INCLUSAO",
+		"DT_CALCULO",
 		"TIPO_DOCUMENTO",
 		"PEDIDO DE PRODUÇÃO CANCELADO?",
 		"RPF",
@@ -114,21 +115,21 @@ func generateFile(base string, status string) *excelize.File {
 		for col, value := range row {
 			letterIdx := col
 
-			if col > 3 && col < 14 {
+			if col > 3 && col < 15 {
 				letterIdx = col + 1
 			}
 
-			if col == 14 {
+			if col == 15 {
 				continue
 			}
 
-			if col == 3 {
-				writeCellValue(newSheet, fmt.Sprintf("%v%v", "D", index+1), cancelado)
-				writeCellValue(newSheet, fmt.Sprintf("%v%v", "E", index+1), value)
+			if col == 4 {
+				writeCellValue(newSheet, fmt.Sprintf("%v%v", "E", index+1), cancelado)
+				writeCellValue(newSheet, fmt.Sprintf("%v%v", "F", index+1), value)
 				continue
 			}
 
-			if col == 10 {
+			if col == 11 {
 				if value == "1" {
 					corte = "COM CORTE"
 				}
@@ -137,17 +138,17 @@ func generateFile(base string, status string) *excelize.File {
 				continue
 			}
 
-			if col >= 15 && col <= 17 && row[14] == "lab" && row[11] == row[15] {
+			if col >= 16 && col <= 18 && row[15] == "lab" && row[12] == row[16] {
 				writeCellValue(newSheet, fmt.Sprintf("%v%v", letters[letterIdx], index+1), "")
 				continue
 			}
 
-			if col >= 11 && col <= 13 && row[14] == "optica" {
+			if col >= 12 && col <= 14 && row[15] == "optica" {
 				writeCellValue(newSheet, fmt.Sprintf("%v%v", letters[letterIdx], index+1), row[col+4])
 				continue
 			}
 
-			if col >= 15 && col <= 17 && row[14] == "optica" {
+			if col >= 16 && col <= 18 && row[15] == "optica" {
 				writeCellValue(newSheet, fmt.Sprintf("%v%v", letters[letterIdx], index+1), "")
 				continue
 			}
