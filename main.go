@@ -26,7 +26,13 @@ func createMap(statusFile string) map[string]string {
 	}
 
 	for _, row := range rows {
-		if len(row) == 4 && strings.Contains(strings.ToLower(row[3]), "cancelado") {
+		if len(row) >= 4 && strings.Contains(strings.ToLower(row[3]), "cancelado") {
+			if len(row) == 6 {
+				log.Printf("Pedido %s cancelado em %s", row[0], row[5])
+			} else {
+				log.Printf("Pedido %s cancelado. Incluído em %s", row[0], row[4])
+			}
+
 			pedidoList[row[0]] = row[3]
 		}
 	}
