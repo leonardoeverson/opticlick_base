@@ -16,16 +16,7 @@ import (
 
 func createMap(statusFile string) map[string]string {
 	rows := readFiles(statusFile)
-
 	pedidoList := map[string]string{}
-
-	//if err != nil {
-	//	log.Fatalln(err)
-	//}
-	//rows, err := file.GetRows(file.GetSheetName(0))
-	//if err != nil {
-	//	log.Fatalln(err)
-	//}
 
 	for _, row := range rows {
 		if len(row) >= 4 && strings.Contains(strings.ToLower(row[3]), "cancelado") {
@@ -89,20 +80,13 @@ func createNewSheet() *excelize.File {
 	return excelize.NewFile()
 }
 
-func getCsvWriter(fileName string) *csv.Writer {
+func getCsvWriter(fileName string) (*csv.Writer, *os.File) {
 	file, err := os.Create(fileName)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	//defer func(file *os.File) {
-	//	err := file.Close()
-	//	if err != nil {
-	//		log.Fatalln(err)
-	//	}
-	//}(file)
-
-	return csv.NewWriter(file)
+	return csv.NewWriter(file), file
 }
 
 func writeDataCsvFile(w *csv.Writer, row []string) {
@@ -133,11 +117,18 @@ func generateFile(base string, status string, fileName string) (*excelize.File, 
 	rows := readFiles(base)
 
 	tipo := getTipo(base, status)
-	var newCsv *csv.Writer
 	var newSheet *excelize.File
+	var newCsv *csv.Writer
 
 	if tipo == "csv" {
-		newCsv = getCsvWriter(fileName)
+		csvWriter, file := getCsvWriter(fileName)
+		newCsv = csvWriter
+		defer func(file *os.File) {
+			err := file.Close()
+			if err != nil {
+				log.Fatalln(err)
+			}
+		}(file)
 		defer newCsv.Flush()
 	} else {
 		newSheet = createNewSheet()
@@ -274,11 +265,8 @@ func generateFile(base string, status string, fileName string) (*excelize.File, 
 			}
 		}
 
-		if len(record) > 0 && tipo == "csv" && newCsv != nil {
-			err := newCsv.Write(record)
-			if err != nil {
-				log.Fatal(err)
-			}
+		if len(record) > 0 && tipo == "csv" {
+			writeDataCsvFile(newCsv, record)
 		}
 	}
 
