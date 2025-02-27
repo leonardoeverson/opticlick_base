@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/csv"
-	_ "encoding/csv"
 	"fmt"
 	"github.com/urfave/cli/v3"
 	"github.com/xuri/excelize/v2"
