@@ -1,10 +1,15 @@
 package main
 
 import (
-	"context"
 	"encoding/csv"
 	"fmt"
-	"github.com/urfave/cli/v3"
+	"fyne.io/fyne/v2"
+	_ "fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/storage"
+	"fyne.io/fyne/v2/widget"
 	"github.com/xuri/excelize/v2"
 	"log"
 	"os"
@@ -296,59 +301,65 @@ func getFileName(fileName string) string {
 	return fmt.Sprintf("%v.xlsx", timeStamp)
 }
 
+func showDialog(window fyne.Window, label *widget.Label) {
+	filter := storage.NewExtensionFileFilter([]string{".csv", ".xlsx"})
+	fileOpen := dialog.NewFileOpen(func(file fyne.URIReadCloser, err error) {
+		if err != nil {
+			dialog.ShowError(err, window)
+			return
+		}
+
+		if file == nil {
+			return
+		}
+
+		label.SetText(file.URI().Path())
+	}, window)
+	fileOpen.SetFilter(filter)
+	fileOpen.Show()
+}
+
 func main() {
-	var arquivoBase string
-	var arquivoStatus string
-	var arquivoFinal string
+	a := app.New()
+	w := a.NewWindow("Processamento de arquivos")
 
-	cmd := &cli.Command{
-		Name:        "Construtor",
-		Description: "Construtor de relatório",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:        "base",
-				Usage:       "Arquivo de base de dados",
-				Aliases:     []string{"b"},
-				Destination: &arquivoBase,
-			},
-			&cli.StringFlag{
-				Name:        "status",
-				Usage:       "Arquivo de status de pedido",
-				Aliases:     []string{"s"},
-				Destination: &arquivoStatus,
-			},
-			&cli.StringFlag{
-				Name:        "final",
-				Aliases:     []string{"f"},
-				Usage:       "Nome do arquivo final",
-				Destination: &arquivoFinal,
-			},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			if cmd.String("base") == "" || cmd.String("status") == "" {
-				fmt.Println("Defina os arquivos de base e status")
-				return nil
+	//base
+	labelBase := widget.NewLabel("Arquivo de base")
+	labelFileBase := widget.NewLabel("Nenhum arquivo selecionado")
+	baseFilePicker := widget.NewButton("Selecionar arquivo de base", func() { showDialog(w, labelFileBase) })
+
+	//status
+	labelStatus := widget.NewLabel("Arquivo de status")
+	labelFileStatus := widget.NewLabel("Nenhum arquivo selecionado")
+	statusFilePicker := widget.NewButton("Selecionar arquivo de status", func() { showDialog(w, labelFileStatus) })
+
+	//progressBar
+	progressBar := widget.NewProgressBar()
+
+	content := container.NewVBox(
+		labelBase,
+		container.NewHBox(labelFileBase, baseFilePicker),
+		labelStatus,
+		container.NewHBox(labelFileStatus, statusFilePicker),
+		widget.NewButton("Processar", func() {
+			var arquivoFinal string
+
+			if labelFileBase.Text == "" || labelFileBase.Text == "Nenhum arquivo selecionado" {
+				dialog.ShowInformation("Arquivo de base", "Arquivo de base faltando", w)
+				return
 			}
 
-			if _, err := os.Stat(cmd.String("base")); err != nil {
-				fmt.Println("Arquivo de base não encontrado")
-				return nil
+			if labelFileStatus.Text == "" || labelFileStatus.Text == "Nenhum arquivo selecionado" {
+				dialog.ShowInformation("Arquivo de status", "Arquivo de status faltando", w)
+				return
 			}
 
-			if _, err := os.Stat(cmd.String("base")); err != nil {
-				fmt.Println("Arquivo de base não encontrado")
-				return nil
-			}
+			progressBar.SetValue(0.2)
+			fileName := getFileName(labelFileBase.Text)
+			progressBar.SetValue(0.3)
+			sheet, _ := generateFile(labelFileBase.Text, labelFileStatus.Text, getFileName(labelFileBase.Text))
 
-			if _, err := os.Stat(cmd.String("status")); err != nil {
-				fmt.Println("Arquivo de status não encontrado")
-				return nil
-			}
-
-			fileName := getFileName(arquivoBase)
-
-			sheet, _ := generateFile(arquivoBase, arquivoStatus, fileName)
-
+			progressBar.SetValue(0.9)
 			if arquivoFinal != "" {
 				fileName = arquivoFinal
 			}
@@ -356,16 +367,16 @@ func main() {
 			if sheet != nil {
 				err := writeFile(sheet, fileName)
 				if err != nil {
-					fmt.Println(fileName)
 					log.Fatalln("Erro ao gerar a planilha final. Erro: ", err)
 				}
 			}
 
-			return nil
-		},
-	}
+			progressBar.SetValue(1)
+		}),
+		progressBar,
+	)
 
-	if err := cmd.Run(context.Background(), os.Args); err != nil {
-		log.Fatalln(err)
-	}
+	w.Resize(fyne.NewSize(800, 600))
+	w.SetContent(content)
+	w.ShowAndRun()
 }
