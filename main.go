@@ -21,10 +21,6 @@ import (
 	"time"
 )
 
-//import (
-//	"theme/theme"
-//)
-
 func createMap(statusFile string) map[string]string {
 	rows := readFiles(statusFile)
 	pedidoList := map[string]string{}
