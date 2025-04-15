@@ -303,6 +303,7 @@ func getFileName(fileName string) string {
 
 func showDialog(window fyne.Window, label *widget.Label) {
 	filter := storage.NewExtensionFileFilter([]string{".csv", ".xlsx"})
+
 	fileOpen := dialog.NewFileOpen(func(file fyne.URIReadCloser, err error) {
 		if err != nil {
 			dialog.ShowError(err, window)
@@ -315,6 +316,14 @@ func showDialog(window fyne.Window, label *widget.Label) {
 
 		label.SetText(file.URI().Path())
 	}, window)
+
+	uri := storage.NewFileURI("./")
+	dir, err := storage.ListerForURI(uri)
+	if err != nil {
+		log.Fatalln("Erro ao definir o diretório inicial")
+	}
+
+	fileOpen.SetLocation(dir)
 	fileOpen.SetFilter(filter)
 	fileOpen.Show()
 }
@@ -328,6 +337,7 @@ func main() {
 	labelFileBase := widget.NewLabel("Nenhum arquivo selecionado")
 	baseFilePicker := widget.NewButton("Selecionar arquivo de base", func() { showDialog(w, labelFileBase) })
 
+	//baseFilePicker.D
 	//status
 	labelStatus := widget.NewLabel("Arquivo de status")
 	labelFileStatus := widget.NewLabel("Nenhum arquivo selecionado")
@@ -343,6 +353,7 @@ func main() {
 		container.NewHBox(labelFileStatus, statusFilePicker),
 		widget.NewButton("Processar", func() {
 			var arquivoFinal string
+			progressBar.SetValue(0)
 
 			if labelFileBase.Text == "" || labelFileBase.Text == "Nenhum arquivo selecionado" {
 				dialog.ShowInformation("Arquivo de base", "Arquivo de base faltando", w)
