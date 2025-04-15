@@ -9,14 +9,21 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/storage"
+	"fyne.io/fyne/v2/theme"
+	_ "fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/xuri/excelize/v2"
 	"log"
+	CustomTheme "opticlick_base/theme"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
+
+//import (
+//	"theme/theme"
+//)
 
 func createMap(statusFile string) map[string]string {
 	rows := readFiles(statusFile)
@@ -387,6 +394,10 @@ func main() {
 		progressBar,
 	)
 
+	a.Settings().SetTheme(&CustomTheme.Loader{
+		Theme:   theme.DefaultTheme(),
+		Variant: theme.VariantLight,
+	})
 	w.Resize(fyne.NewSize(800, 600))
 	w.SetContent(content)
 	w.ShowAndRun()
