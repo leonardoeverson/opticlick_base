@@ -118,33 +118,7 @@ func getTipo(base string, status string) string {
 	return "csv"
 }
 
-func generateFile(base string, status string, fileName string) (*excelize.File, *csv.Writer) {
-	pedidoList := createMap(status)
-
-	rows := readFiles(base)
-
-	tipo := getTipo(base, status)
-	var newSheet *excelize.File
-	var newCsv *csv.Writer
-
-	if tipo == "csv" {
-		csvWriter, file := getCsvWriter(fileName)
-		newCsv = csvWriter
-		defer func(file *os.File) {
-			err := file.Close()
-			if err != nil {
-				log.Fatalln(err)
-			}
-		}(file)
-		defer newCsv.Flush()
-	} else {
-		newSheet = createNewSheet()
-	}
-
-	letters := []string{
-		"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
-	}
-
+func writeHeader(tipo string, sheet *excelize.File, writer *csv.Writer) {
 	columns := []string{
 		"PEDIDO",
 		"DT_INCLUSAO",
@@ -170,109 +144,133 @@ func generateFile(base string, status string, fileName string) (*excelize.File, 
 		"RAZAO_SOCIAL_OPTICA",
 	}
 
-	for index, row := range rows {
-		cancelado := "NÃO"
-		corte := "SEM CORTE"
+	letters := getLetters()
 
-		if index == 0 {
-			var record []string
+	if tipo == "xlsx" {
+		for idx, col := range columns {
+			writeCellValue(sheet, fmt.Sprintf("%v%v", letters[idx], 1), col)
+		}
+	} else {
+		writeDataCsvFile(writer, columns)
+	}
+}
 
-			for idx, col := range columns {
-				if tipo == "xlsx" {
-					writeCellValue(newSheet, fmt.Sprintf("%v%v", letters[idx], 1), col)
-				} else {
-					record = append(record, col)
-				}
-			}
+func getLetters() []string {
+	return []string{
+		"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
+	}
+}
 
-			if len(record) > 0 && tipo == "csv" {
-				writeDataCsvFile(newCsv, record)
-			}
+func processRow(row []string, index int, tipo string, pedidos map[string]string, sheet *excelize.File) []string {
+	letters := getLetters()
+	cancelado := "NÃO"
+	if _, ok := pedidos[row[0]]; ok {
+		cancelado = "SIM"
+	}
 
+	record := make([]string, 0)
+
+	for col, value := range row {
+		if col == 15 {
 			continue
 		}
 
-		if _, ok := pedidoList[row[0]]; ok {
-			cancelado = "SIM"
+		letterIdx := col
+		if col > 3 && col < 15 {
+			letterIdx++
 		}
 
-		var record []string
-
-		for col, value := range row {
-			letterIdx := col
-
-			if col > 3 && col < 15 {
-				letterIdx = col + 1
-			}
-
-			if col == 15 {
-				continue
-			}
-
-			if col == 4 {
-				if tipo == "xlsx" {
-					writeCellValue(newSheet, fmt.Sprintf("%v%v", "E", index+1), cancelado)
-					writeCellValue(newSheet, fmt.Sprintf("%v%v", "F", index+1), value)
-				} else {
-					record = append(record, cancelado)
-					record = append(record, value)
-				}
-
-				continue
-			}
-
-			if col == 11 {
-				if value == "1" {
-					corte = "COM CORTE"
-				}
-
-				if tipo == "xlsx" {
-					writeCellValue(newSheet, fmt.Sprintf("%v%v", letters[letterIdx], index+1), corte)
-				} else {
-					record = append(record, corte)
-				}
-
-				continue
-			}
-
-			if col >= 16 && col <= 18 && row[15] == "lab" && row[12] == row[16] {
-				if tipo == "xlsx" {
-					writeCellValue(newSheet, fmt.Sprintf("%v%v", letters[letterIdx], index+1), "")
-				} else {
-					record = append(record, "")
-				}
-
-				continue
-			}
-
-			if col >= 12 && col <= 14 && row[15] == "optica" {
-				if tipo == "xlsx" {
-					writeCellValue(newSheet, fmt.Sprintf("%v%v", letters[letterIdx], index+1), row[col+4])
-				} else {
-					record = append(record, row[col+4])
-				}
-
-				continue
-			}
-
-			if col >= 16 && col <= 18 && row[15] == "optica" {
-				if tipo == "xlsx" {
-					writeCellValue(newSheet, fmt.Sprintf("%v%v", letters[letterIdx], index+1), "")
-				} else {
-					record = append(record, "")
-				}
-
-				continue
-			}
-
+		switch {
+		case col == 4:
 			if tipo == "xlsx" {
-				writeCellValue(newSheet, fmt.Sprintf("%v%v", letters[letterIdx], index+1), value)
+				writeCellValue(sheet, fmt.Sprintf("E%v", index+1), cancelado)
+				writeCellValue(sheet, fmt.Sprintf("F%v", index+1), value)
+			} else {
+				record = append(record, cancelado, value)
+			}
+
+		case col == 11:
+			corte := "SEM CORTE"
+			if value == "1" {
+				corte = "COM CORTE"
+			}
+			if tipo == "xlsx" {
+				writeCellValue(sheet, fmt.Sprintf("%v%v", letters[letterIdx], index+1), corte)
+			} else {
+				record = append(record, corte)
+			}
+
+		case col >= 16 && col <= 18 && row[15] == "lab" && row[12] == row[16]:
+			if tipo == "xlsx" {
+				writeCellValue(sheet, fmt.Sprintf("%v%v", letters[letterIdx], index+1), "")
+			} else {
+				record = append(record, "")
+			}
+
+		case col >= 12 && col <= 14 && row[15] == "optica":
+			val := row[col+4]
+			if tipo == "xlsx" {
+				writeCellValue(sheet, fmt.Sprintf("%v%v", letters[letterIdx], index+1), val)
+			} else {
+				record = append(record, val)
+			}
+
+		case col >= 16 && col <= 18 && row[15] == "optica":
+			if tipo == "xlsx" {
+				writeCellValue(sheet, fmt.Sprintf("%v%v", letters[letterIdx], index+1), "")
+			} else {
+				record = append(record, "")
+			}
+
+		default:
+			if tipo == "xlsx" {
+				writeCellValue(sheet, fmt.Sprintf("%v%v", letters[letterIdx], index+1), value)
 			} else {
 				record = append(record, value)
 			}
 		}
+	}
 
-		if len(record) > 0 && tipo == "csv" {
+	return record
+}
+
+func generateFile(bar *widget.ProgressBar, base string, status string, fileName string) (*excelize.File, *csv.Writer) {
+	pedidoList := createMap(status)
+	rows := readFiles(base)
+	tipo := getTipo(base, status)
+
+	var (
+		newSheet *excelize.File
+		newCsv   *csv.Writer
+		file     *os.File
+	)
+
+	incremento := 0.6 / float64(len(rows))
+
+	if tipo == "csv" {
+		newCsv, file = getCsvWriter(fileName)
+		defer func(file *os.File) {
+			err := file.Close()
+			if err != nil {
+				log.Fatal(err)
+			}
+		}(file)
+		defer newCsv.Flush()
+	} else {
+		newSheet = createNewSheet()
+	}
+
+	writeHeader(tipo, newSheet, newCsv)
+
+	for index, row := range rows {
+		bar.SetValue(bar.Value + incremento)
+
+		if index == 0 {
+			continue
+		}
+
+		record := processRow(row, index, tipo, pedidoList, newSheet)
+		if tipo == "csv" && len(record) > 0 {
 			writeDataCsvFile(newCsv, record)
 		}
 	}
@@ -331,20 +329,53 @@ func showDialog(window fyne.Window, label *widget.Label) {
 	fileOpen.Show()
 }
 
+func processHandler(progressBar *widget.ProgressBar, labelFileBase *widget.Label, labelFileStatus *widget.Label, window fyne.Window) {
+	var _ string
+	progressBar.SetValue(0)
+
+	if labelFileBase.Text == "" || labelFileBase.Text == "Nenhum arquivo selecionado" {
+		dialog.ShowInformation("Arquivo de base", "Arquivo de base faltando", window)
+		return
+	}
+
+	if labelFileStatus.Text == "" || labelFileStatus.Text == "Nenhum arquivo selecionado" {
+		dialog.ShowInformation("Arquivo de status", "Arquivo de status faltando", window)
+		return
+	}
+
+	progressBar.SetValue(0.2)
+	fileName := getFileName(labelFileBase.Text)
+	progressBar.SetValue(0.3)
+	sheet, _ := generateFile(progressBar, labelFileBase.Text, labelFileStatus.Text, getFileName(labelFileBase.Text))
+
+	progressBar.SetValue(0.9)
+	//if arquivoFinal != "" {
+	//	fileName = arquivoFinal
+	//}
+
+	if sheet != nil {
+		err := writeFile(sheet, fileName)
+		if err != nil {
+			log.Fatalln("Erro ao gerar a planilha final. Erro: ", err)
+		}
+	}
+
+	progressBar.SetValue(1)
+}
+
 func main() {
 	a := app.New()
-	w := a.NewWindow("Processamento de arquivos")
+	window := a.NewWindow("Processamento de arquivos")
 
 	//base
 	labelBase := widget.NewLabel("Arquivo de base")
 	labelFileBase := widget.NewLabel("Nenhum arquivo selecionado")
-	baseFilePicker := widget.NewButton("Selecionar arquivo de base", func() { showDialog(w, labelFileBase) })
+	baseFilePicker := widget.NewButton("Selecionar arquivo de base", func() { showDialog(window, labelFileBase) })
 
-	//baseFilePicker.D
 	//status
 	labelStatus := widget.NewLabel("Arquivo de status")
 	labelFileStatus := widget.NewLabel("Nenhum arquivo selecionado")
-	statusFilePicker := widget.NewButton("Selecionar arquivo de status", func() { showDialog(w, labelFileStatus) })
+	statusFilePicker := widget.NewButton("Selecionar arquivo de status", func() { showDialog(window, labelFileStatus) })
 
 	//progressBar
 	progressBar := widget.NewProgressBar()
@@ -355,37 +386,7 @@ func main() {
 		labelStatus,
 		container.NewHBox(labelFileStatus, statusFilePicker),
 		widget.NewButton("Processar", func() {
-			var arquivoFinal string
-			progressBar.SetValue(0)
-
-			if labelFileBase.Text == "" || labelFileBase.Text == "Nenhum arquivo selecionado" {
-				dialog.ShowInformation("Arquivo de base", "Arquivo de base faltando", w)
-				return
-			}
-
-			if labelFileStatus.Text == "" || labelFileStatus.Text == "Nenhum arquivo selecionado" {
-				dialog.ShowInformation("Arquivo de status", "Arquivo de status faltando", w)
-				return
-			}
-
-			progressBar.SetValue(0.2)
-			fileName := getFileName(labelFileBase.Text)
-			progressBar.SetValue(0.3)
-			sheet, _ := generateFile(labelFileBase.Text, labelFileStatus.Text, getFileName(labelFileBase.Text))
-
-			progressBar.SetValue(0.9)
-			if arquivoFinal != "" {
-				fileName = arquivoFinal
-			}
-
-			if sheet != nil {
-				err := writeFile(sheet, fileName)
-				if err != nil {
-					log.Fatalln("Erro ao gerar a planilha final. Erro: ", err)
-				}
-			}
-
-			progressBar.SetValue(1)
+			processHandler(progressBar, labelFileBase, labelFileStatus, window)
 		}),
 		progressBar,
 	)
@@ -394,7 +395,7 @@ func main() {
 		Theme:   theme.DefaultTheme(),
 		Variant: theme.VariantLight,
 	})
-	w.Resize(fyne.NewSize(800, 600))
-	w.SetContent(content)
-	w.ShowAndRun()
+	window.Resize(fyne.NewSize(800, 600))
+	window.SetContent(content)
+	window.ShowAndRun()
 }
